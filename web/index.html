@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFS-e Validador - valide seu XML antes de pagar uma API</title>
+<meta name="description" content="Validador offline de XML de NFS-e. Roda inteiro no seu navegador, sem enviar nada para servidor nenhum.">
+<style>
+  :root {
+    --bg: #0f1115;
+    --painel: #171a21;
+    --painel-2: #1e222b;
+    --borda: #2a2f3a;
+    --texto: #e6e8ee;
+    --suave: #9aa3b2;
+    --erro: #ff6b6b;
+    --aviso: #ffc857;
+    --ok: #4ade80;
+    --acento: #5b9cff;
+    --raio: 10px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f7f8fa; --painel: #fff; --painel-2: #f0f2f6; --borda: #d9dee7;
+      --texto: #131722; --suave: #5a6272;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 1rem 4rem;
+    background: var(--bg); color: var(--texto);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  .limite { max-width: 860px; margin: 0 auto; }
+  header { padding: 2.5rem 0 1.5rem; }
+  h1 { font-size: 1.9rem; margin: 0 0 .5rem; letter-spacing: -.02em; }
+  h2 { font-size: 1.25rem; margin: 2.5rem 0 .75rem; }
+  .sub { color: var(--suave); margin: 0 0 1rem; }
+  .aviso-offline {
+    display: inline-flex; align-items: center; gap: .45rem;
+    background: var(--painel-2); border: 1px solid var(--borda);
+    border-radius: 999px; padding: .3rem .8rem;
+    font-size: .82rem; color: var(--suave);
+  }
+  .painel {
+    background: var(--painel); border: 1px solid var(--borda);
+    border-radius: var(--raio); padding: 1.25rem; margin: 1rem 0;
+  }
+  .zona {
+    border: 2px dashed var(--borda); border-radius: var(--raio);
+    padding: 2rem 1rem; text-align: center; color: var(--suave);
+    transition: border-color .15s, background .15s;
+  }
+  .zona.ativa { border-color: var(--acento); background: var(--painel-2); }
+  textarea {
+    width: 100%; min-height: 220px; margin-top: 1rem;
+    background: var(--bg); color: var(--texto);
+    border: 1px solid var(--borda); border-radius: 8px;
+    padding: .85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .85rem; resize: vertical;
+  }
+  textarea:focus-visible, button:focus-visible, .botao:focus-visible {
+    outline: 2px solid var(--acento); outline-offset: 2px;
+  }
+  .botoes { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+  button, .botao {
+    background: var(--acento); color: #fff; border: 0;
+    border-radius: 8px; padding: .6rem 1.1rem;
+    font-size: .92rem; font-weight: 600; cursor: pointer;
+    text-decoration: none; display: inline-block;
+  }
+  button.sec { background: var(--painel-2); color: var(--texto); border: 1px solid var(--borda); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .resumo { margin-top: 1.25rem; padding: 1rem 1.25rem; border-radius: var(--raio);
+            font-weight: 700; display: none; }
+  .resumo.ok { display: block; background: rgba(74,222,128,.12); color: var(--ok);
+              border: 1px solid var(--ok); }
+  .resumo.erro { display: block; background: rgba(255,107,107,.12); color: var(--erro);
+                 border: 1px solid var(--erro); }
+  .resumo.aviso { display: block; background: rgba(255,200,87,.12); color: var(--aviso);
+                  border: 1px solid var(--aviso); }
+  ul.issues { list-style: none; padding: 0; margin: 1rem 0 0; }
+  ul.issues li {
+    background: var(--painel-2); border-left: 3px solid var(--erro);
+    border-radius: 6px; padding: .8rem 1rem; margin-bottom: .6rem;
+  }
+  ul.issues li.aviso { border-left-color: var(--aviso); }
+  .cod {
+    font-family: ui-monospace, Menlo, monospace; font-size: .8rem;
+    background: var(--bg); padding: .1rem .45rem; border-radius: 4px;
+    border: 1px solid var(--borda);
+  }
+  .msg { margin: .4rem 0; }
+  .caminho { font-family: ui-monospace, Menlo, monospace; font-size: .78rem; color: var(--suave);
+             word-break: break-all; }
+  .dica { font-size: .85rem; color: var(--suave); }
+  .dica::before { content: "\2192  "; }
+  .honesto { border-left: 3px solid var(--aviso); padding-left: 1rem; }
+  .honesto ul { color: var(--suave); }
+  code { background: var(--painel-2); padding: .1rem .4rem; border-radius: 4px; font-size: .88em; }
+  .rodape { margin-top: 3rem; color: var(--suave); font-size: .85rem;
+            border-top: 1px solid var(--borda); padding-top: 1rem; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  @media (max-width: 600px) { header { padding-top: 1.5rem; } h1 { font-size: 1.5rem; } }
+</style>
+</head>
+<body>
+<div class="limite">
+
+<header>
+  <h1>NFS-e Validador</h1>
+  <p class="sub">
+    Descubra se o seu XML de NFS-e esta correto <strong>antes</strong> de contratar
+    uma API que so libera homologacao depois do pagamento.
+  </p>
+  <p class="aviso-offline">
+    <span aria-hidden="true">&#128274;</span> 100% offline &middot; seu XML nao sai deste navegador
+  </p>
+</header>
+
+<div class="painel">
+  <div class="zona" id="zona" tabindex="0" role="button"
+       aria-label="Area para soltar o arquivo XML, ou clique para escolher">
+    Arraste seu <code>.xml</code> aqui, ou clique para escolher o arquivo
+    <input type="file" id="arquivo" accept=".xml,text/xml,application/xml" class="sr">
+  </div>
+
+  <label class="sr" for="xml">Conteudo do XML de NFS-e</label>
+  <textarea id="xml" spellcheck="false" autocapitalize="off" autocomplete="off"
+    placeholder="...ou cole o conteudo do XML aqui"></textarea>
+
+  <div class="botoes">
+    <button id="validar" type="button">Validar XML</button>
+    <button id="exemplo" type="button" class="sec">Usar exemplo valido</button>
+    <button id="limpar" type="button" class="sec">Limpar</button>
+  </div>
+
+  <div id="resumo" class="resumo" role="status" aria-live="polite"></div>
+  <ul id="issues" class="issues"></ul>
+</div>
+
+<h2>O que esta ferramenta <span class="honesto" style="display:inline; border:0; padding:0;">NÃO faz</span></h2>
+<div class="painel honesto">
+  <p>Para nao te wasting tempo depois, sendo direto:</p>
+  <ul>
+    <li><strong>Nao verifica assinatura digital.</strong> Nao valida criptografia XMLDSig/RSA
+        nem certificado. Usamos uma biblioteca de assinatura de verdade para isso.</li>
+    <li><strong>Nao valida contra o XSD do seu municipio.</strong> Cada prefeitura tem
+        um schema proprio. Aqui checamos regras <em>estruturais e aritmeticas</em> comuns ao
+        padrao ABRASF.</li>
+    <li><strong>Nao substitui a homologacao do provedor.</strong> Se voce precisa saber se
+        o seu caso especifico passa, o unico jeito e submeter ao provedor.</li>
+    <li><strong>Nao e advice juridico ou tributario.</strong> Isto e uma ferramenta de
+        desenvolvimento.</li>
+  </ul>
+</div>
+
+<h2>Regras aritmeticas conferidas</h2>
+<div class="painel">
+  <ul>
+    <li><code>vServicos</code> = soma do <code>vServ</code> dos itens</li>
+    <li><code>vBC</code> = soma das bases de calculo dos itens</li>
+    <li><code>vISS</code> = soma dos ISS dos itens</li>
+    <li><code>vTotTrib</code> = soma dos tributos dos itens</li>
+    <li><code>vLiq</code> = base menos <code>vDescIncond</code> menos <code>vDeducao</code></li>
+    <li>Sem itens declarados, os totais tem que ser zero</li>
+  </ul>
+  <p class="dica">Tolerancia de 0,01 (um centavo) para nao acusar erro por arredondamento.</p>
+</div>
+
+<div class="rodape">
+  <p>
+    Versao 1.0.0 &middot; MIT &middot; Codigo aberto, sem rastreamento, sem cookies.<br>
+    Para o validador completo, com batch e saida JSON, veja o projeto no GitHub.
+  </p>
+</div>
+
+</div>
+
+<script>
+"use strict";
+(function () {
+
+  // ---- Nenhuma requisicao externa. Tudo roda local. ----------------------
+  var TOLERANCIA = 0.01;
+
+  var xml = document.getElementById("xml");
+  var zona = document.getElementById("zona");
+  var inputArquivo = document.getElementById("arquivo");
+  var btnValidar = document.getElementById("validar");
+  var btnExemplo = document.getElementById("exemplo");
+  var btnLimpar = document.getElementById("limpar");
+  var resumo = document.getElementById("resumo");
+  var listaIssues = document.getElementById("issues");
+
+  // ---- Utilitarios ------------------------------------------------------
+  function digitos(s) { return (s || "").replace(/\D/g, ""); }
+
+  function cpfValido(cpf) {
+    var d = digitos(cpf);
+    if (!/^\d{11}$/.test(d)) return false;
+    if (/^(\d)\1{10}$/.test(d)) return false;
+    var s = 0, i;
+    for (i = 0; i < 9; i++) s += parseInt(d[i], 10) * (10 - i);
+    var r = (s * 10) % 11; if (r === 10) r = 0;
+    if (r !== parseInt(d[9], 10)) return false;
+    s = 0;
+    for (i = 0; i < 10; i++) s += parseInt(d[i], 10) * (11 - i);
+    r = (s * 10) % 11; if (r === 10) r = 0;
+    return r === parseInt(d[10], 10);
+  }
+
+  function cnpjValido(cnpj) {
+    var d = digitos(cnpj);
+    if (!/^\d{14}$/.test(d)) return false;
+    if (/^(\d)\1{13}$/.test(d)) return false;
+    var pesos1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+    var pesos2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
+    var i, s = 0, r;
+    for (i = 0; i < 12; i++) s += parseInt(d[i], 10) * pesos1[i];
+    r = (s % 11) < 2 ? 0 : 11 - (s % 11);
+    if (r !== parseInt(d[12], 10)) return false;
+    s = 0;
+    for (i = 0; i < 13; i++) s += parseInt(d[i], 10) * pesos2[i];
+    r = (s % 11) < 2 ? 0 : 11 - (s % 11);
+    return r === parseInt(d[13], 10);
+  }
+
+  function num(v) {
+    if (v === null || v === undefined) return null;
+    var t = String(v).trim().replace(",", ".");
+    if (t === "") return null;
+    if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
+    return parseFloat(t);
+  }
+
+  function no(el, tag) {
+    if (!el) return null;
+    // getElementsByTagName pega descendentes; aqui queremos o filho direto.
+    for (var i = 0; i < el.children.length; i++) {
+      if (el.children[i].localName === tag) return el.children[i];
+    }
+    return null;
+  }
+
+  function txt(el, tag) {
+    var n = no(el, tag);
+    return n ? (n.textContent || "").trim() : "";
+  }
+
+  function caminhoDe(el) {
+    var partes = [], atual = el;
+    while (atual && atual.nodeType === 1) {
+      var nome = atual.localName;
+      var pai = atual.parentElement;
+      if (pai) {
+        var irmaos = 0, pos = 0;
+        for (var i = 0; i < pai.children.length; i++) {
+          if (pai.children[i].localName === nome) {
+            irmaos++;
+            if (pai.children[i] === atual) pos = irmaos;
+          }
+        }
+        if (irmaos > 1) nome += "[" + pos + "]";
+      }
+      partes.unshift(nome);
+      atual = atual.parentElement;
+    }
+    return partes.join("/");
+  }
+
+  // ---- Acumulador de problemas -----------------------------------------
+  function Relatorio() { this.itens = []; }
+  Relatorio.prototype.add = function (codigo, severidade, msg, caminho, dica) {
+    this.itens.push({ codigo: codigo, severidade: severidade, msg: msg,
+                      caminho: caminho || "", dica: dica || "" });
+  };
+  Relatorio.prototype.erro = function (c, m, p, d) { this.add(c, "erro", m, p, d); };
+  Relatorio.prototype.aviso = function (c, m, p, d) { this.add(c, "aviso", m, p, d); };
+  Relatorio.prototype.erros = function () {
+    return this.itens.filter(function (i) { return i.severidade === "erro"; });
+  };
+  Relatorio.prototype.avisos = function () {
+    return this.itens.filter(function (i) { return i.severidade === "aviso"; });
+  };
+
+  // ---- Validacao --------------------------------------------------------
+  function validar(texto) {
+    var rel = new Relatorio();
+    if (!texto || !texto.trim()) {
+      rel.erro("XML_VAZIO", "Nenhum XML informado.", "",
+               "Cole o conteudo do arquivo XML.");
+      return rel;
+    }
+
+    var doc;
+    try {
+      doc = new DOMParser().parseFromString(texto, "application/xml");
+    } catch (e) {
+      rel.erro("XML_MALFORMADO", "Nao foi possivel ler o XML.", "", String(e));
+      return rel;
+    }
+
+    var erroParser = doc.getElementsByTagName("parsererror")[0];
+    if (erroParser) {
+      var detalhe = (erroParser.textContent || "").replace(/\s+/g, " ").trim();
+      rel.erro("XML_MALFORMADO", "XML malformado.", "",
+               detalhe.substring(0, 180) + " - confira tags fechadas e caracteres especiais (& precisa ser &amp;).");
+      return rel;
+    }
+
+    var raiz = doc.documentElement;
+    if (!raiz) {
+      rel.erro("XML_SEM_RAIZ", "Nenhum elemento raiz encontrado.", "", "");
+      return rel;
+    }
+    if (raiz.localName !== "NFSe") {
+      rel.erro("ENVELOPE_RAIZ_INVALIDA",
+               "Elemento raiz invalido: esperado <NFSe>, encontrado <" + raiz.localName + ">.",
+               caminhoDe(raiz), "A raiz do documento deve ser <NFSe>.");
+    }
+
+    var nfse = raiz.localName === "NFSe" ? raiz : no(raiz, "NFSe");
+    if (!nfse) {
+      rel.erro("ENV_NFSE_AUSENTE", "Elemento <NFSe> ausente.", caminhoDe(raiz),
+               "O documento precisa de <NFSe>.");
+      return rel;
+    }
+
+    // Assinatura (presenca, nao criptografia)
+    var sig = no(nfse, "InfNFeSig");
+    if (!sig) {
+      rel.erro("INFNFESIG_AUSENTE", "Elemento <InfNFeSig> ausente.", caminhoDe(nfse),
+               "Todo XML de NFS-e assinado precisa de <InfNFeSig>.");
+    }
+
+    var infnfe = (sig && no(sig, "InfNFe")) || no(nfse, "InfNFe");
+    if (!infnfe) {
+      rel.erro("ENV_INFNFE_AUSENTE", "Elemento <InfNFe> ausente.", caminhoDe(nfse),
+               "Inclua <InfNFe> com os dados fiscais da nota.");
+      return rel;
+    }
+
+    // Ide
+    var ide = no(infnfe, "Ide");
+    if (!ide) {
+      rel.erro("IDE_AUSENTE", "Elemento <Ide> ausente.", caminhoDe(infnfe),
+               "Todo InfNFe precisa de <Ide>.");
+    } else {
+      if (!txt(ide, "cStat")) {
+        rel.erro("IDE_CSTAT_OBRIGATORIO", "Campo obrigatorio <cStat> ausente.", caminhoDe(ide),
+                 "Use <cStat>1</cStat> para NFS-e normal.");
+      } else if (txt(ide, "cStat") !== "1") {
+        rel.erro("IDE_CSTAT_INVALIDO", "Valor invalido em <cStat>: " + txt(ide, "cStat") + ".",
+                 caminhoDe(ide), "Em NFS-e, <cStat> deve ser 1.");
+      }
+      var nnf = txt(ide, "nNF");
+      if (!nnf) {
+        rel.erro("IDE_NNF_OBRIGATORIO", "Campo obrigatorio <nNF> ausente.", caminhoDe(ide),
+                 "Inclua <nNF> com um inteiro positivo.");
+      } else if (!/^\d+$/.test(nnf)) {
+        rel.erro("IDE_NNF_NAO_NUMERICO", "<nNF> nao e numerico: " + nnf + ".", caminhoDe(ide),
+                 "<nNF> e um inteiro.");
+      } else if (parseInt(nnf, 10) <= 0) {
+        rel.erro("IDE_NNF_NAO_POSITIVO", "<nNF> deve ser maior que zero.", caminhoDe(ide),
+                 "Numeracao de NFS-e comeca em 1.");
+      }
+      var chave = digitos(txt(ide, "chNFe"));
+      if (!chave) {
+        rel.erro("IDE_CHAVE_ACESSO_OBRIGATORIA", "Campo obrigatorio <chNFe> ausente.", caminhoDe(ide),
+                 "Inclua <chNFe> com os 44 digitos da chave de acesso.");
+      } else if (!/^\d{44}$/.test(chave)) {
+        rel.erro("IDE_CHAVE_ACESSO_INVALIDA", "Chave de acesso deve ter 44 digitos.", caminhoDe(ide),
+                 "A chave de acesso tem 44 digitos, apenas numeros.");
+      }
+      var cmunfg = txt(ide, "cMunFG");
+      if (!cmunfg) {
+        rel.erro("IDE_CMUNFG_OBRIGATORIO", "Campo obrigatorio <cMunFG> ausente.", caminhoDe(ide),
+                 "Inclua <cMunFG> com 7 digitos do codigo IBGE.");
+      } else if (!/^[1-5]\d{6}$/.test(digitos(cmunfg))) {
+        rel.erro("IDE_CMUNFG_INVALIDO", "Codigo de municipio invalido: " + cmunfg + ".", caminhoDe(ide),
+                 "Use o codigo IBGE com 7 digitos.");
+      }
+    }
+
+    // Emitente
+    var emit = no(infnfe, "Emitente");
+    if (!emit) {
+      rel.erro("EMITENTE_AUSENTE", "Elemento <Emitente> ausente.", caminhoDe(infnfe),
+               "Todo InfNFe precisa de <Emitente>.");
+    } else {
+      var cnpj = txt(emit, "CNPJ"), cpf = txt(emit, "CPF");
+      if (cnpj && cpf) {
+        rel.erro("EMITENTE_CNPJ_E_CPF", "<Emitente> tem <CNPJ> e <CPF> ao mesmo tempo.",
+                 caminhoDe(emit), "Preencha apenas um.");
+      } else if (cnpj) {
+        if (!/^\d{14}$/.test(digitos(cnpj))) {
+          rel.erro("EMITENTE_CNPJ_E_CPF", "<CNPJ> parece um CPF (" + digitos(cnpj).length + " digitos).",
+                   caminhoDe(emit), "CPF tem 11 digitos, CNPJ tem 14.");
+        } else if (!cnpjValido(cnpj)) {
+          rel.erro("EMITENTE_CNPJ_INVALIDO", "CNPJ do emitente tem digito verificador incorreto.",
+                   caminhoDe(emit), "Recalcule os dois digitos verificadores (mod-11).");
+        }
+      } else if (cpf) {
+        if (!cpfValido(cpf)) {
+          rel.erro("EMITENTE_CPF_INVALIDO", "CPF do emitente tem digito verificador incorreto.",
+                   caminhoDe(emit), "Recalcule os dois digitos verificadores (mod-11).");
+        }
+      } else {
+        rel.erro("EMITENTE_CNPJ_OBRIGATORIO", "<Emitente> sem <CNPJ> e sem <CPF>.",
+                 caminhoDe(emit), "Inclua um dos dois para identificar o prestador.");
+      }
+      if (!txt(emit, "xNome") && !txt(emit, "xFant")) {
+        rel.erro("EMITENTE_RAZAO_SOCIAL_OBRIGATORIA", "<Emitente> sem <xNome> nem <xFant>.",
+                 caminhoDe(emit), "Inclua <xNome> com a razao social.");
+      }
+    }
+
+    // Servico
+    var servico = no(infnfe, "Servico");
+    if (!servico) {
+      rel.erro("SERVICO_AUSENTE", "Elemento <Servico> ausente.", caminhoDe(infnfe),
+               "Todo InfNFe precisa de <Servico>.");
+    }
+
+    var itens = [];
+    if (servico) {
+      var lista = no(servico, "ListaServico");
+      if (!lista) {
+        rel.erro("LISTA_SERVICO_AUSENTE", "Elemento <ListaServico> ausente.", caminhoDe(servico),
+                 "Inclua <ListaServico> com ao menos um <Servico>.");
+      } else if (lista.children.length === 0) {
+        rel.erro("LISTA_SERVICO_VAZIA", "<ListaServico> sem nenhum item <Servico>.",
+                 caminhoDe(lista), "Adicione ao menos um <Servico> com codigo e valor.");
+      } else {
+        for (var i = 0; i < lista.children.length; i++) {
+          if (lista.children[i].localName === "Servico") itens.push(lista.children[i]);
+        }
+      }
+    }
+
+    // Totais + reconciliacao aritmetica
+    var total = no(infnfe, "Total");
+    if (!total) {
+      rel.erro("TOTAL_AUSENTE", "Elemento <Total> ausente.", caminhoDe(infnfe),
+               "Todo InfNFe precisa de <Total>.");
+    } else {
+      var iss = no(total, "ISS") || total;
+      var issRet = no(total, "ISSRetido") || total;
+
+      function somar(tag) {
+        var s = 0, achou = false;
+        for (var j = 0; j < itens.length; j++) {
+          var v = num(txt(itens[j], tag));
+          if (v !== null) { s += v; achou = true; }
+        }
+        return achou ? s : null;
+      }
+
+      function conferir(decl, esperado, campo, noEl, oque) {
+        if (decl === null || esperado === null) return;
+        var dif = decl - esperado;
+        if (Math.abs(dif) <= TOLERANCIA) return;
+        rel.erro(
+          campo,
+          "<" + campo + "> declarado (" + decl.toFixed(2) + ") difere da soma (" +
+          esperado.toFixed(2) + "). Diferenca de " + dif.toFixed(2) + ".",
+          caminhoDe(noEl),
+          oque + " A diferenca esta acima da tolerancia de 0,01."
+        );
+      }
+
+      // Soma dos vServ dos itens (aceita vServ, vServico ou vProd)
+      var somaServ = null, somaBC = null, somaISS = null, somaTrib = null;
+      for (var k = 0; k < itens.length; k++) {
+        var it = itens[k];
+        var vs = num(txt(it, "vServ"));
+        if (vs === null) vs = num(txt(it, "vServico"));
+        if (vs === null) vs = num(txt(it, "vProd"));
+        if (vs !== null) somaServ = (somaServ || 0) + vs;
+        var bc = num(txt(it, "vBC"));
+        if (bc !== null) somaBC = (somaBC || 0) + bc;
+        var vi = num(txt(it, "vISS"));
+        if (vi !== null) somaISS = (somaISS || 0) + vi;
+        var vt = num(txt(it, "vTotTrib"));
+        if (vt !== null) somaTrib = (somaTrib || 0) + vt;
+      }
+
+      conferir(num(txt(iss, "vServicos")), somaServ, "SOMA_VSERVICO_DIVERGENTE", iss,
+                "Soma dos valores dos itens de servico.");
+      conferir(num(txt(iss, "vBC")), somaBC, "SOMA_VBC_DIVERGENTE", iss,
+                "Soma das bases de calculo dos itens.");
+      conferir(num(txt(iss, "vISS")), somaISS, "SOMA_VISS_DIVERGENTE", iss,
+                "Soma dos valores de ISS dos itens.");
+      conferir(num(txt(issRet, "vTotTrib")), somaTrib, "SOMA_VTOTTRIB_DIVERGENTE", issRet,
+                "Soma dos tributos sobre servicos (LC 116).");
+
+      // Liquido = base - vDescIncond - vDeducao
+      var base = num(txt(issRet, "vServico"));
+      if (base === null) base = num(txt(issRet, "vServicos"));
+      if (base === null) base = num(txt(iss, "vServicos"));
+      var liq = num(txt(issRet, "vLiq"));
+      if (base !== null && liq !== null) {
+        var desc = num(txt(issRet, "vDescIncond")) || 0;
+        var ded = num(txt(issRet, "vDeducao")) || 0;
+        conferir(liq, base - desc - ded, "LIQUIDO_NAO_CONFERE", issRet,
+                  "Valor liquido = base de calculo menos vDescIncond menos vDeducao.");
+      }
+
+      // Sem itens, os totais tem que ser zero.
+      if (itens.length === 0) {
+        rel.erro("TOTAL_SEM_ITENS",
+                 "Nenhum item de servico declarado, mas ha totais consolidados no XML.",
+                 caminhoDe(total),
+                 "Uma NFS-e sem itens so faz sentido com tudo zerado. Confira a geracao de <ListaServico>.");
+        ["vServicos", "vISS", "vBC"].forEach(function (campo) {
+          var v = num(txt(iss, campo));
+          if (v !== null && v !== 0) {
+            rel.erro("TOTAL_SEM_ITENS_NAO_ZERO",
+                     "<" + campo + "> e " + v + " mas <ListaServico> esta sem itens.",
+                     caminhoDe(iss), "Sem itens nao ha valor a consolidar. Zere o total ou corrija a lista.");
+          }
+        });
+      }
+    }
+
+    return rel;
+  }
+
+  // ---- Renderizacao -----------------------------------------------------
+  function mostrar(rel) {
+    listaIssues.innerHTML = "";
+    var erros = rel.erros(), avisos = rel.avisos();
+
+    if (erros.length === 0 && avisos.length === 0) {
+      resumo.className = "resumo ok";
+      resumo.textContent = "OK - nenhum problema encontrado.";
+      return;
+    }
+    if (erros.length > 0) {
+      resumo.className = "resumo erro";
+      resumo.textContent = erros.length + " erro(s) e " + avisos.length + " aviso(s).";
+    } else {
+      resumo.className = "resumo aviso";
+      resumo.textContent = "Nenhum erro, mas " + avisos.length + " aviso(s).";
+    }
+
+    var todos = erros.concat(avisos);
+    for (var i = 0; i < todos.length; i++) {
+      var it = todos[i];
+      var li = document.createElement("li");
+      if (it.severidade === "aviso") li.className = "aviso";
+
+      var cod = document.createElement("span");
+      cod.className = "cod";
+      cod.textContent = it.codigo;
+      li.appendChild(cod);
+
+      var msg = document.createElement("p");
+      msg.className = "msg";
+      msg.textContent = it.msg;
+      li.appendChild(msg);
+
+      if (it.caminho) {
+        var cam = document.createElement("div");
+        cam.className = "caminho";
+        cam.textContent = "em " + it.caminho;
+        li.appendChild(cam);
+      }
+      if (it.dica) {
+        var dica = document.createElement("div");
+        dica.className = "dica";
+        dica.textContent = it.dica;
+        li.appendChild(dica);
+      }
+      listaIssues.appendChild(li);
+    }
+  }
+
+  // ---- Eventos ----------------------------------------------------------
+  function validarAgora() { mostrar(validar(xml.value)); }
+
+  btnValidar.addEventListener("click", validarAgora);
+
+  btnLimpar.addEventListener("click", function () {
+    xml.value = "";
+    listaIssues.innerHTML = "";
+    resumo.className = "resumo";
+    resumo.textContent = "";
+    xml.focus();
+  });
+
+  zona.addEventListener("click", function () { inputArquivo.click(); });
+  zona.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputArquivo.click(); }
+  });
+
+  inputArquivo.addEventListener("change", function () {
+    var f = inputArquivo.files && inputArquivo.files[0];
+    if (!f) return;
+    var leitor = new FileReader();
+    leitor.onload = function (e) {
+      xml.value = e.target.result;
+      validarAgora();
+    };
+    leitor.readAsText(f);
+  });
+
+  ["dragenter", "dragover"].forEach(function (ev) {
+    zona.addEventListener(ev, function (e) {
+      e.preventDefault(); e.stopPropagation();
+      zona.classList.add("ativa");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    zona.addEventListener(ev, function (e) {
+      e.preventDefault(); e.stopPropagation();
+      zona.classList.remove("ativa");
+    });
+  });
+  zona.addEventListener("drop", function (e) {
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f) return;
+    var leitor = new FileReader();
+    leitor.onload = function (ev) { xml.value = ev.target.result; validarAgora(); };
+    leitor.readAsText(f);
+  });
+
+  // Exemplo sintetico: CNPJ e CPF com digito verificador correto, valores coerentes.
+  btnExemplo.addEventListener("click", function () {
+    var chave = "35260111222333000181550010000000011123456781";
+    xml.value =
+'<?xml version="1.0" encoding="UTF-8"?>\n' +
+'<NFSe xmlns="http://www.abrasf.org.br/nfse.xsd">\n' +
+'  <InfNFeSig>\n' +
+'    <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">\n' +
+'      <SignedInfo><Reference URI="#' + chave + '"></Reference></SignedInfo>\n' +
+'      <SignatureValue>U0lOVEVUSUNDRVJU0FS</SignatureValue>\n' +
+'    </Signature>\n' +
+'    <InfNFe>\n' +
+'      <Ide>\n' +
+'        <cStat>1</cStat><cMunFG>3550308</cMunFG><nNF>1</nNF>\n' +
+'        <dhEmi>2026-01-15T10:30:00-03:00</dhEmi>\n' +
+'        <chNFe>' + chave + '</chNFe>\n' +
+'      </Ide>\n' +
+'      <Emitente>\n' +
+'        <CNPJ>11222333000181</CNPJ>\n' +
+'        <xNome>EMPRESA SINTETICA DE TESTE LTDA</xNome>\n' +
+'        <UF>SP</UF>\n' +
+'      </Emitente>\n' +
+'      <Servico>\n' +
+'        <ListaServico>\n' +
+'          <Servico>\n' +
+'            <codTributacao>01.07</codTributacao>\n' +
+'            <xServ>Servico de teste sintetico</xServ>\n' +
+'            <vServ>1000.00</vServ><vBC>1000.00</vBC>\n' +
+'            <aliq>5.00</aliq><vISS>50.00</vISS><vTotTrib>120.00</vTotTrib>\n' +
+'          </Servico>\n' +
+'        </ListaServico>\n' +
+'      </Servico>\n' +
+'      <Total>\n' +
+'        <ISS><vBC>1000.00</vBC><vServicos>1000.00</vServicos><vISS>50.00</vISS></ISS>\n' +
+'        <ISSRetido><vServico>1000.00</vServico><vDescIncond>50.00</vDescIncond>\n' +
+'        <vISSRetido>0.00</vISSRetido><vTotTrib>120.00</vTotTrib><vLiq>950.00</vLiq></ISSRetido>\n' +
+'      </Total>\n' +
+'    </InfNFe>\n' +
+'  </InfNFeSig>\n' +
+'</NFSe>';
+    validarAgora();
+  });
+
+})();
+</script>
+</body>
+</html>
