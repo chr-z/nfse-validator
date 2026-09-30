@@ -227,6 +227,34 @@
     return r === parseInt(d[13], 10);
   }
 
+  // Digito verificador mod-11 da chave de acesso (43 digitos -> 1 digito).
+  function chaveDv(corpo) {
+    var peso = 2, total = 0;
+    for (var i = corpo.length - 1; i >= 0; i--) {
+      total += parseInt(corpo[i], 10) * peso;
+      peso = peso === 9 ? 2 : peso + 1;
+    }
+    var dv = 11 - (total % 11);
+    return (dv === 0 || dv === 10 || dv === 11) ? 0 : dv;
+  }
+
+  // 44 digitos + DV mod-11 correto + posicoes de UF e mes coerentes.
+  var CODIGO_PARA_UF = {};
+  (function () {
+    var m = {RO:11,AC:12,AM:13,RR:14,PA:15,AP:16,TO:17,MA:18,PI:19,CE:21,RN:22,
+             PB:23,PE:25,AL:27,SE:28,BA:29,MG:31,ES:32,RJ:33,SP:35,PR:41,SC:42,
+             RS:43,MS:50,MT:51,GO:52,DF:53};
+    for (var uf in m) { if (m.hasOwnProperty(uf)) CODIGO_PARA_UF[m[uf]] = uf; }
+  })();
+
+  function chaveValida(chave) {
+    if (!/^\d{44}$/.test(chave)) return false;
+    if (parseInt(chave[43], 10) !== chaveDv(chave.substring(0, 43))) return false;
+    if (!CODIGO_PARA_UF[parseInt(chave.substring(0, 2), 10)]) return false;
+    var mes = parseInt(chave.substring(4, 6), 10);
+    return mes >= 1 && mes <= 12;
+  }
+
   function num(v) {
     if (v === null || v === undefined) return null;
     var t = String(v).trim().replace(",", ".");
@@ -286,6 +314,29 @@
   };
 
   // ---- Validacao --------------------------------------------------------
+  // Ordem esperada dentro de <Ide> (perfil nacional). Elementos fora de ordem
+  // sao rejeitados por validadores que usam xs:sequence.
+  var ORDEM_IDE = ["cStat","cServ","cMunFG","nNF","cVerif","dhEmi","dEmi","dhSai",
+    "tpNF","idDest","cMun","tpImp","tpEmis","cDV","tpAmb","finNFe","indFinal",
+    "indPres","indIntermed","procEmi","verProc","chNFe"];
+
+  function conferirOrdem(el, ordem, rotulo) {
+    var pos = {}, i;
+    for (i = 0; i < ordem.length; i++) pos[ordem[i]] = i;
+    var ultimo = -1, ultimoNome = "";
+    for (i = 0; i < el.children.length; i++) {
+      var nome = el.children[i].localName;
+      if (Object.prototype.hasOwnProperty.call(pos, nome)) {
+        if (pos[nome] < ultimo) {
+          return nome + " aparece fora de ordem; " + ultimoNome + " deveria vir depois.";
+        }
+        ultimo = pos[nome];
+        ultimoNome = nome;
+      }
+    }
+    return null;
+  }
+
   function validar(texto) {
     var rel = new Relatorio();
     if (!texto || !texto.trim()) {
@@ -348,6 +399,13 @@
       rel.erro("IDE_AUSENTE", "Elemento <Ide> ausente.", caminhoDe(infnfe),
                "Todo InfNFe precisa de <Ide>.");
     } else {
+      var problemaOrdem = conferirOrdem(ide, ORDEM_IDE);
+      if (problemaOrdem) {
+        rel.erro("IDE_ORDEM_INVALIDA",
+                 "Elemento fora de ordem em <Ide>: " + problemaOrdem,
+                 caminhoDe(ide),
+                 "Neste perfil a ordem e sequencial. Mova o elemento para a posicao correta.");
+      }
       if (!txt(ide, "cStat")) {
         rel.erro("IDE_CSTAT_OBRIGATORIO", "Campo obrigatorio <cStat> ausente.", caminhoDe(ide),
                  "Use <cStat>1</cStat> para NFS-e normal.");
@@ -373,6 +431,11 @@
       } else if (!/^\d{44}$/.test(chave)) {
         rel.erro("IDE_CHAVE_ACESSO_INVALIDA", "Chave de acesso deve ter 44 digitos.", caminhoDe(ide),
                  "A chave de acesso tem 44 digitos, apenas numeros.");
+      } else if (!chaveValida(chave)) {
+        rel.erro("IDE_CHAVE_ACESSO_INVALIDA",
+                 "Chave de acesso invalida: digito verificador mod-11 ou posicoes de UF/mes nao conferem.",
+                 caminhoDe(ide),
+                 "A chave tem 44 digitos com DV mod-11. Confira os 43 primeiros e recalcule o ultimo.");
       }
       var cmunfg = txt(ide, "cMunFG");
       if (!cmunfg) {

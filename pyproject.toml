@@ -1,32 +1,41 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "nfse-validator"
 version = "1.0.0"
-description = "Validador offline de XML de NFS-e para devs que precisam testar antes de pagar um provedor"
+description = "Validador offline de XML de NFS-e (Nota Fiscal de Servico eletronica) - sem dependencias, sem rede"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = { text = "MIT" }
-keywords = ["nfs-e", "nota-fiscal", "xml", "validator", "brasil", "iss"]
+authors = [{ name = "NFS-e Validador" }]
+keywords = ["nfs-e", "nfse", "nota-fiscal", "xml", "validator", "iss", "abrasf"]
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "Environment :: Console",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Natural Language :: Portuguese (Brazilian)",
-    "Programming Language :: Python :: 3",
-    "Topic :: Office/Business :: Financial :: Accounting",
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Natural Language :: Portuguese (Brazilian)",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Text Processing :: Markup :: XML",
 ]
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/SEU-USUARIO/nfse-validator"
-Issues = "https://github.com/SEU-USUARIO/nfse-validator/issues"
+Homepage = "https://github.com/seu-usuario/nfse-validator"
+Issues = "https://github.com/seu-usuario/nfse-validator/issues"
 
 [project.scripts]
 nfse-validator = "nfse_validator.cli:main"
 
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
 [tool.setuptools.packages.find]
 include = ["nfse_validator*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

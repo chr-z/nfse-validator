@@ -84,6 +84,11 @@ def documento_base(
     sem_ide: bool = False,
     sem_infnsig: bool = False,
     assinatura_incompleta: bool = False,
+    assinatura_vazia: bool = False,
+    assinatura_sem_reference: bool = False,
+    assinatura_sem_valor: bool = False,
+    assinatura_valor_vazio: bool = False,
+    assinatura_fora: bool = False,
     uri_invalida: bool = False,
     itens_total_overrides: Optional[Dict[str, str]] = None,
 ) -> str:
@@ -183,7 +188,29 @@ def documento_base(
         corpo = infnfe
     else:
         uri = "http://exemplo.invalido" if uri_invalida else f"#{chave}"
-        if assinatura_incompleta:
+        if assinatura_vazia:
+            assinatura = "<Signature></Signature>"
+        elif assinatura_sem_reference:
+            assinatura = (
+                '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">'
+                "<SignedInfo></SignedInfo>"
+                "<SignatureValue>U0lOVEVUSUNBLVlNIRVM=</SignatureValue>"
+                "</Signature>"
+            )
+        elif assinatura_sem_valor:
+            assinatura = (
+                '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">'
+                f'<SignedInfo><Reference URI="{uri}"></Reference></SignedInfo>'
+                "</Signature>"
+            )
+        elif assinatura_valor_vazio:
+            assinatura = (
+                '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">'
+                f'<SignedInfo><Reference URI="{uri}"></Reference></SignedInfo>'
+                "<SignatureValue></SignatureValue>"
+                "</Signature>"
+            )
+        elif assinatura_incompleta:
             assinatura = f'<Signature><Reference URI="{uri}"></Reference></Signature>'
         else:
             assinatura = (
@@ -198,10 +225,11 @@ def documento_base(
         infnsig = f"<InfNFeSig>{assinatura}{infnfe}</InfNFeSig>"
         corpo = infnsig
 
+    assinatura_extra = "<Signature></Signature>" if assinatura_fora else ""
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<NFSe xmlns="http://www.abrasf.org.br/nfse.xsd">'
-        f"{corpo}"
+        f"{corpo}{assinatura_extra}"
         "</NFSe>"
     )
 

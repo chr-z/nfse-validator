@@ -352,19 +352,30 @@ def validar_ide(ctx: Ctx, infnfe: Optional[Node]) -> None:
         dt = _parse_iso(bruto)
         if dt is None:
             if re.match(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}", bruto):
-                ctx.erro(
-                    C.IDE_DTEMI_INVALIDO,
-                    f"Data/hora invalida em <dhEmi>: {bruto!r}.",
-                    node_dt.path(),
-                    "O formato esperado e ISO-8601: 2026-01-15T10:30:00-03:00.",
-                    node_dt,
-                )
+                # Tem data e hora, mas o fuso (Z ou +hh:mm) nao fecha: e o
+                # caso classico de <dEmi>/<dhEmi> sem deslocamento.
+                if not re.search(r"(Z|[+-]\d{2}:\d{2})$", bruto):
+                    ctx.erro(
+                        C.IDE_DTEMI_SEM_FUSO,
+                        f"<dEmi> sem fuso horario: {bruto!r}.",
+                        node_dt.path(),
+                        "Inclua o deslocamento, ex.: 2026-01-15T10:30:00-03:00.",
+                        node_dt,
+                    )
+                else:
+                    ctx.erro(
+                        C.IDE_DTEMI_INVALIDO,
+                        f"Data/hora invalida em <dhEmi>: {bruto!r}.",
+                        node_dt.path(),
+                        "O formato esperado e ISO-8601: 2026-01-15T10:30:00-03:00.",
+                        node_dt,
+                    )
             elif re.match(r"^\d{4}-\d{2}-\d{2}", bruto):
                 ctx.erro(
                     C.IDE_DTEMI_SEM_FUSO,
-                    f"<dEmi> sem fuso horario: {bruto!r}.",
+                    f"Data sem hora em <dEmi>: {bruto!r}.",
                     node_dt.path(),
-                    "Quando usar <dEmi>, inclua o fuso (ex.: 2026-01-15T10:30:00-03:00).",
+                    "Use data e hora com fuso, ex.: 2026-01-15T10:30:00-03:00.",
                     node_dt,
                 )
             else:
@@ -401,11 +412,14 @@ def validar_ide(ctx: Ctx, infnfe: Optional[Node]) -> None:
             )
         else:
             ano_esperado = ano_emissao
-            ok = validar_chave_acesso(chave, ano_esperado=ano_esperado)
-            if not ok:
+            # A chave e validada em dois passos independentes: primeiro o
+            # formato/DV, depois a coerencia do ano com a data de emissao.
+            # Sao checagens separadas de proposito -- assim um ano divergente
+            # vira aviso especifico, em vez de ser engolido pelo erro de DV.
+            if not validar_chave_acesso(chave):
                 ctx.erro(
                     C.IDE_CHAVE_ACESSO_INVALIDA,
-                    "Chave de acesso invalida: digito verificador mod-11 ou posicoes de UF/ano nao conferem.",
+                    "Chave de acesso invalida: digito verificador mod-11 ou posicoes de UF/mes nao conferem.",
                     chave_node.path(),
                     "A chave tem 44 digitos com DV mod-11. Confira os 43 primeiros digitos e recalcule o ultimo.",
                     chave_node,
@@ -413,7 +427,7 @@ def validar_ide(ctx: Ctx, infnfe: Optional[Node]) -> None:
             elif ano_esperado is not None and int(chave[2:4]) != ano_esperado % 100:
                 ctx.aviso(
                     C.IDE_CHAVE_ACESSO_ANO_DIVERGENTE,
-                    f"Ano da chave de acesso ({chave[2:4]}) difere do ano de emissao ({ano_esperado}).",
+                    f"Ano da chave de acesso ({chave[2:4]}) difere do ano de emissao ({ano_emissao}).",
                     chave_node.path(),
                     "A posicao 3-4 da chave traz AAMM. Emissao e chave devem concordar.",
                     chave_node,

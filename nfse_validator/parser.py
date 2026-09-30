@@ -209,6 +209,24 @@ def parse(
         parser.Parse(payload, True)
     except expat.ExpatError as exc:
         raise XmlError(_expat_to_issue(exc, source)) from exc
+    except LookupError as exc:
+        # O expat levanta LookupError (nao ExpatError) quando a declaracao
+        # de encoding nomeia um codec inexistente. Sem isto, um XML com
+        # encoding="ISO-8859-1-FOO" derrubaria a validacao com excecao.
+        raise XmlError(
+            Issue(
+                code="XML_ENCODING_INVALIDO",
+                severity=ERROR,
+                message=f"Declaracao de codificacao invalida: {exc}.",
+                path="",
+                line=1,
+                column=1,
+                hint=(
+                    "O XML declara uma codificacao que o Python nao conhece. "
+                    "Use UTF-8, que e o recomendado para NFS-e."
+                ),
+            )
+        ) from exc
 
     root = builder.root
     if root is None:
@@ -238,6 +256,16 @@ def _expat_to_issue(exc: expat.ExpatError, source: str) -> Issue:
         hint = (
             "Use uma codificacao suportada pelo XML (UTF-8 e o recomendado). "
             "Em PHP, grave o arquivo com mb_convert_encoding($xml, 'UTF-8', 'UTF-8')."
+        )
+    elif msg == "no element found":
+        # O expat aceita um documento so com processing instructions e
+        # comentarios, mas nao ha elemento raiz: isso e o que o NFS-e
+        # proibe.
+        code = "XML_SEM_RAIZ"
+        message = "Nenhum elemento raiz encontrado no documento."
+        hint = (
+            "Todo XML precisa de exatamente um elemento raiz. O documento tem "
+            "apenas declaracoes ou comentarios."
         )
     elif code_number in _ERRO_RAIZES and "junk after document element" in msg:
         code = "XML_RAIZES_MULTIPLAS"
